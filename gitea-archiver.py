@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import requests
 import json
-import sys
 import os
-from typing import List, Dict, Optional
-import urllib
 import shutil
+import sys
+import urllib.parse
+from typing import Dict, List, Tuple
+
+import requests
 
 lock_file = "cache.lock"
 cache_file = "cache.json"
@@ -51,7 +52,7 @@ def archive_filepath(dest: str, repo: str, branch: str) -> str:
 
 def list_branches(
     session: requests.Session, url: str, user: str, repo: str
-) -> Optional[List[str]]:
+) -> List[Tuple[str, str]]:
     with session.get(f"{url}/repos/{user}/{repo}/branches") as r:
         r.raise_for_status()
         branches = json.loads(r.text)
@@ -97,7 +98,8 @@ def archive(url_base: str, token: str, dest: str) -> None:
 
     if not acquire_lock(dest):
         print(
-            "Another archive job is running, aborting. If the previous job crashed, run with --break-locks",
+            "Another archive job is running, aborting. "
+            "If the previous job crashed, run with --break-locks",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -154,4 +156,8 @@ if __name__ == "__main__":
     if args.break_locks:
         break_lock(args.dest)
 
-    archive(args.url, args.token, args.dest)
+    try:
+        archive(args.url, args.token, args.dest)
+    except Exception as e:
+        print(f"Fatal error: {e}", file=sys.stderr)
+        sys.exit(1)
