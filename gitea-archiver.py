@@ -8,6 +8,7 @@ import sys
 import os
 from typing import List, Dict, Optional
 import urllib
+import shutil
 
 lock_file = "cache.lock"
 cache_file = "cache.json"
@@ -40,6 +41,14 @@ def write_cache(cache: Dict, dest: str) -> None:
         json.dump(cache, f, indent=4)
 
 
+def archive_filename(branch: str) -> str:
+    return f"{branch}.zip"
+
+
+def archive_filepath(dest: str, repo: str, branch: str) -> str:
+    return os.path.join(dest, repo, archive_filename(branch))
+
+
 def list_branches(
     session: requests.Session, url: str, user: str, repo: str
 ) -> Optional[List[str]]:
@@ -66,13 +75,13 @@ def get_user(session: requests.Session, url: str) -> str:
 def archive_branch(
     session: requests.Session, url: str, user: str, repo: str, branch: str, dest: str
 ) -> None:
-    archive_file = f"{branch}.zip"
+    archive_file = archive_filename(branch)
     with session.get(f"{url}/repos/{user}/{repo}/archive/{archive_file}") as r:
         r.raise_for_status()
-        os.makedirs(os.path.join(dest, repo), exist_ok=True)
-        with open(os.path.join(dest, repo, archive_file), "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+        archive_path = archive_filepath(dest, repo, branch)
+        os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+        with open(archive_path, "wb") as f:
+            shutil.copyfileobj(r.raw, f)
 
 
 def archive(url_base: str, token: str, dest: str) -> None:
@@ -83,6 +92,8 @@ def archive(url_base: str, token: str, dest: str) -> None:
     )
 
     user = get_user(session, url)
+
+    os.makedirs(args.dest, exist_ok=True)
 
     if not acquire_lock(dest):
         print(
@@ -103,15 +114,25 @@ def archive(url_base: str, token: str, dest: str) -> None:
                 cache[user][repo] = {}
 
             for branch, last_commit in list_branches(session, url, user, repo):
-                print(f"Checking {user}/{repo}/{branch}... ", end="")
+                print(f"Checking {user}/{repo}/{branch}")
                 cached_commit = cache[user][repo].get(branch)
-                if cached_commit == last_commit:
-                    print("cache up to date")
+                archive_file = archive_filepath(dest, repo, branch)
+                if cached_commit == last_commit and os.path.exists(archive_file):
+                    print("-> Archive up to date")
                 else:
-                    print("found new commits")
-                    archive_branch(session, url, user, repo, branch, dest)
+                    print("-> Found new commits. Downloading...")
+                    archive_branch(
+                        session=session,
+                        url=url,
+                        user=user,
+                        repo=repo,
+                        branch=branch,
+                        dest=dest,
+                    )
                     cache[user][repo][branch] = last_commit
                     write_cache(cache, dest)
+                    print(f"-> Downloaded to {archive_file}")
+                print()
 
         break_lock(dest)
     except Exception as e:
