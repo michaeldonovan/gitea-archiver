@@ -7,6 +7,7 @@ import json
 import sys
 import os
 import tqdm
+from typing import List
 
 
 def list_branches(
@@ -66,9 +67,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Downloads archives of all gitea repositories for a user."
     )
-    parser.add_argument("--url", help="Gitea instance URL")
-    parser.add_argument("--token", help="Gitea access token")
-    parser.add_argument("--dest", help="Archive destination")
+    parser.add_argument("--url", help="Gitea instance URL", required=True)
+    parser.add_argument("--token", help="Gitea access token", required=True)
+    parser.add_argument("--dest", help="Archive destination", required=True)
 
     args = parser.parse_args()
     archive(args.url, args.token, args.dest)
