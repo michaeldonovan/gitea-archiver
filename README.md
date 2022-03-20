@@ -1,6 +1,6 @@
 # gitea-archiver
 
-A simple python script to download archives of all of a user's repositories from [Gitea[(https://gitea.io)
+A simple python script to download archives of all of a user's repositories from [Gitea](https://gitea.io)
 
 # Usage
 
